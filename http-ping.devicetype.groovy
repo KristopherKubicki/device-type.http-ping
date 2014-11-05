@@ -23,7 +23,9 @@ preferences {
 metadata {
 	definition (name: "Ping", namespace: "Ping", author: "Kristopher Kubicki") {
 		capability "Polling"
-		attribute "status", "string"
+		capability "Contact Sensor"
+		capability "Refresh"        
+      
         attribute "ttl", "string"
         attribute "last_request", "number"
         attribute "last_live", "number"
@@ -34,9 +36,12 @@ metadata {
 	}
 
 	tiles {
-		standardTile("status", "device.status", width: 2, height: 2, canChangeIcon: false, canChangeBackground: true) {
-            state "Down", label: '${device.name} Down', backgroundColor: "#FF0000", icon:"st.secondary.off"
-            state "Up", label: '${device.name} Up', backgroundColor: "#32CD32", icon:"st.switches.light.on"
+		standardTile("contact", "device.contact", width: 2, height: 2, canChangeIcon: false, canChangeBackground: true) {
+//
+// color scheme is inverse of a normal sensor. 
+//
+            state "open", label: '${name}', backgroundColor: "#ffa81e", icon:"st.contact.contact.open"
+            state "closed", label: '${name}', backgroundColor: "#79b821", icon:"st.contact.contact.closed"
         }
         standardTile("refresh", "device.ttl", inactiveLabel: false, decoration: "flat") {
             state "default", action:"polling.poll", icon:"st.secondary.refresh"
@@ -44,8 +49,8 @@ metadata {
         standardTile("ttl", "device.ttl", inactiveLabel: false, decoration: "flat") {
             state "ttl", label:'${ttl}'
         }
-		main "status"
-        	details(["status", "refresh", "ttl"])
+		main "contact"
+        	details(["contact", "refresh", "ttl"])
 		}
 		// TODO: define your main and details tiles here
 	}
@@ -53,8 +58,9 @@ metadata {
 
 
 
+
 def parse(String description) {
-//  log.debug "Parsing '${description}'"
+	log.debug "Parsing '${description}'"
     def map = stringToMap(description)
 
 //  def headerString = new String(map.headers.decodeBase64())
@@ -63,12 +69,12 @@ def parse(String description) {
 //	log.debug "Parsing '${bodyString}'"
     
     def c = new GregorianCalendar()
-    sendEvent(name: 'status', value: "${device.name} Up")
+    sendEvent(name: 'contact', value: "open")
     sendEvent(name: 'last_live', value: c.time.time)
     def ping = ttl()
     sendEvent(name: 'ttl', value: ping)
     
-    log.debug "Pinging ${device.deviceNetworkId}: ${ping}"
+   log.debug "Pinging ${device.deviceNetworkId}: ${ping}"
 
 }
 
@@ -117,9 +123,9 @@ private ttl() {
         ttl = ttl / 1000
         units = "s"
     }  
-    def ttl_int = ttl.intValue()
+	def ttl_int = ttl.intValue()
     
-    "${ttl_int} ${units}"
+	"${ttl_int} ${units}"
 }
 
 
@@ -129,16 +135,17 @@ def poll() {
     def hosthex = convertIPToHex(dest_ip)
     def porthex = Long.toHexString(Long.parseLong(dest_port))
     if (porthex.length() < 4) { porthex = "00" + porthex }
-    device.deviceNetworkId = "$hosthex:$porthex" 
+	device.deviceNetworkId = "$hosthex:$porthex" 
     
 //   log.debug "The DNI configured is $device.deviceNetworkId"
-   
+       
     def hubAction = new physicalgraph.device.HubAction(
     	method: "GET",
     	path: "/"
     )        
+    
   
-    def last_request = device.latestValue("last_request")
+	def last_request = device.latestValue("last_request")
     def last_live = device.latestValue("last_live")
     if(!last_request) {
     	last_request = 0
@@ -147,12 +154,14 @@ def poll() {
     	last_live = 0
     }
 
-    def c = new GregorianCalendar()
+	def c = new GregorianCalendar()
+    
     if(last_live < last_request) { 
-    	sendEvent(name: 'status', value: "${device.name} Down")  
+    	sendEvent(name: 'contact', value: "closed")  
         sendEvent(name: 'ttl', value: ttl())
     }
     sendEvent(name: 'last_request', value: c.time.time)
+
        
 //  log.debug hubAction
     
